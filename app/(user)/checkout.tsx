@@ -1,13 +1,11 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Image,
   Linking,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -16,136 +14,154 @@ import { useCart } from '../../context/CartContext';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
-
   const [method, setMethod] = useState('QRIS');
-  const [customerName, setCustomerName] = useState('');
-
   const router = useRouter();
 
-  const handleConfirm = async () => {
-    if (cart.length === 0) {
-      Alert.alert(
-        'Keranjang kosong',
-        'Silakan pilih menu terlebih dahulu.'
-      );
-      return;
-    }
+  // Generate invoice number
+  const invoiceNumber = useMemo(() => {
+    const randomNumber = Math.floor(
+      10000 + Math.random() * 90000
+    );
+    return `MNR-${randomNumber}`;
+  }, []);
 
-    if (!customerName.trim()) {
-      Alert.alert(
-        'Nama wajib diisi',
-        'Masukkan nama pemesan.'
-      );
-      return;
-    }
+  // Generate tanggal
+  const today = new Date().toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
 
+  const handleWhatsappConfirm = async () => {
     const adminNumber = '6281269197525';
 
-    const orderDetails = cart
-      .map(
-        (item) =>
-          `• ${item.name} x${item.quantity} = Rp ${(item.price * item.quantity).toLocaleString('id-ID')}`
-      )
-      .join('\n');
+    const message =
+      method === 'QRIS'
+        ? `
+Halo MOCK'N'ROLLS! Saya ingin konfirmasi pembayaran.
 
-    const message = `
-*PESANAN BARU MOCK'N'ROLLS*
+No. Invoice: ${invoiceNumber}
+Total: Rp ${totalPrice.toLocaleString('id-ID')}
 
-Nama Pemesan:
-${customerName}
+Saya akan segera mengirimkan bukti transfernya. Terima kasih!
+`
+        : `
+Halo MOCK'N'ROLLS! Saya ingin konfirmasi pesanan cash.
 
-Detail Pesanan:
-${orderDetails}
+No. Invoice: ${invoiceNumber}
+Total: Rp ${totalPrice.toLocaleString('id-ID')}
 
-Total Pembayaran:
-Rp ${totalPrice.toLocaleString('id-ID')}
-
-Metode Pembayaran:
-${method}
-
-Status:
-SUDAH MELAKUKAN PEMBAYARAN
+Saya akan melakukan pembayaran saat pengambilan pesanan. Terima kasih!
 `;
 
     const whatsappUrl =
       `https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`;
 
-    try {
-      await Linking.openURL(whatsappUrl);
+    await Linking.openURL(whatsappUrl);
 
-      Alert.alert(
-        'Pesanan berhasil',
-        'Pesanan sudah dikirim ke WhatsApp admin.'
-      );
-
-      clearCart();
-      router.push('/(user)/menu');
-    } catch (error) {
-      Alert.alert(
-        'Gagal membuka WhatsApp',
-        'Pastikan WhatsApp sudah terinstall.'
-      );
-    }
+    clearCart();
+    router.push('/(user)/menu');
   };
 
   return (
     <View style={styles.wrapper}>
       <Navbar />
 
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>
-          Checkout Pesanan
-        </Text>
-
-        {/* Nama Pemesan */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>
-            Data Pemesan
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Receipt */}
+        <View style={styles.receiptCard}>
+          <Text style={styles.brandTitle}>
+            MOCK'N'ROLLS
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Nama Pemesan"
-            value={customerName}
-            onChangeText={setCustomerName}
-          />
-        </View>
-
-        {/* Ringkasan Pesanan */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>
-            Ringkasan Pesanan
+          <Text style={styles.brandSub}>
+            PREMIUM RISOL & MOCKTAIL
           </Text>
 
-          {cart.map((item) => (
-            <View key={item.id} style={styles.orderRow}>
-              <Text style={styles.orderName}>
-                {item.name} x{item.quantity}
+          <View style={styles.line} />
+
+          {/* Invoice */}
+          <View style={styles.invoiceRow}>
+            <View>
+              <Text style={styles.label}>
+                NO. INVOICE
               </Text>
 
-              <Text style={styles.orderPrice}>
-                Rp {(item.price * item.quantity).toLocaleString('id-ID')}
+              <Text style={styles.invoiceText}>
+                {invoiceNumber}
               </Text>
             </View>
-          ))}
-        </View>
 
-        {/* Total */}
-        <View style={styles.card}>
-          <Text style={styles.label}>
-            Total Pembayaran
+            <View>
+              <Text style={styles.label}>
+                TANGGAL
+              </Text>
+
+              <Text style={styles.invoiceText}>
+                {today}
+              </Text>
+            </View>
+          </View>
+
+          {/* Order List */}
+          <View style={styles.orderList}>
+            {cart.map((item) => (
+              <View
+                key={item.id}
+                style={styles.orderRow}
+              >
+                <Text style={styles.orderQty}>
+                  {item.quantity}x
+                </Text>
+
+                <Text style={styles.orderName}>
+                  {item.name}
+                </Text>
+
+                <Text style={styles.orderPrice}>
+                  Rp {(item.price * item.quantity).toLocaleString('id-ID')}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.line} />
+
+          {/* Total */}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>
+              Total Pembayaran
+            </Text>
+
+            <Text style={styles.totalValue}>
+              Rp {totalPrice.toLocaleString('id-ID')}
+            </Text>
+          </View>
+
+          {/* QRIS */}
+          {method === 'QRIS' && (
+            <View style={styles.qrSection}>
+              <Image
+                source={require('../../assets/images/qris-payment.png')}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+
+          {/* Dynamic Notes */}
+          <Text style={styles.noteText}>
+            {method === 'QRIS'
+              ? '* Pesanan diproses setelah konfirmasi bukti bayar.'
+              : '* Pesanan diproses dan dibayar saat pengambilan (Cash).'}
           </Text>
 
-          <Text style={styles.totalPrice}>
-            Rp {totalPrice.toLocaleString('id-ID')}
+          <Text style={styles.noteText}>
+            Terima kasih sudah jajan di MOCK'N'ROLLS!
           </Text>
         </View>
 
-        {/* Metode Pembayaran */}
-        <Text style={styles.subTitle}>
-          Pilih Metode Pembayaran
-        </Text>
-
+        {/* Payment Method */}
         <View style={styles.methodContainer}>
           <TouchableOpacity
             style={[
@@ -179,44 +195,28 @@ SUDAH MELAKUKAN PEMBAYARAN
                   : styles.normalText
               }
             >
-              CASH (PO)
+              CASH
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tampilan pembayaran */}
-        {method === 'QRIS' ? (
-          <View style={styles.paymentBox}>
-            <Text style={styles.paymentHint}>
-              Scan QR berikut untuk pembayaran:
-            </Text>
-
-            <Image
-              source={require('../../assets/images/qris-payment.png')}
-              style={styles.qrisImage}
-              resizeMode="contain"
-            />
-
-            <Text style={styles.brandName}>
-              MOCK'N'ROLLS OFFICIAL
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.paymentBox}>
-            <Text style={styles.cashText}>
-              Pembayaran cash dilakukan saat pengambilan
-              pesanan (Pre Order).
-            </Text>
-          </View>
-        )}
-
-        {/* Tombol konfirmasi */}
+        {/* WhatsApp Button */}
         <TouchableOpacity
-          style={styles.confirmBtn}
-          onPress={handleConfirm}
+          style={styles.whatsappBtn}
+          onPress={handleWhatsappConfirm}
         >
-          <Text style={styles.confirmText}>
-            KONFIRMASI PESANAN
+          <Text style={styles.whatsappText}>
+            Konfirmasi ke WhatsApp
+          </Text>
+        </TouchableOpacity>
+
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.push('/(user)/menu')}
+        >
+          <Text style={styles.backText}>
+            Kembali ke Beranda
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -227,94 +227,133 @@ SUDAH MELAKUKAN PEMBAYARAN
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#F4F1E9'
+    backgroundColor: '#F7F7F7'
   },
 
   container: {
-    flex: 1,
-    padding: 20
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D4628',
-    marginBottom: 20
-  },
-
-  card: {
-    backgroundColor: 'white',
     padding: 20,
-    borderRadius: 15,
-    marginBottom: 20,
-    elevation: 2
+    alignItems: 'center'
   },
 
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  receiptCard: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 25,
+    elevation: 5
+  },
+
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
     color: '#2D4628'
   },
 
-  input: {
-    borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 10,
-    padding: 14,
-    backgroundColor: '#FAFAFA'
+  brandSub: {
+    textAlign: 'center',
+    color: '#A0522D',
+    fontWeight: 'bold',
+    marginBottom: 25
+  },
+
+  line: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#DDD',
+    marginVertical: 20
+  },
+
+  invoiceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+
+  label: {
+    color: '#999',
+    fontSize: 12
+  },
+
+  invoiceText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginTop: 5
+  },
+
+  orderList: {
+    marginVertical: 20
   },
 
   orderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10
+    marginBottom: 12
+  },
+
+  orderQty: {
+    width: 40,
+    fontWeight: 'bold'
   },
 
   orderName: {
-    fontSize: 14,
-    color: '#333'
+    flex: 1,
+    fontSize: 16
   },
 
   orderPrice: {
-    fontSize: 14,
     fontWeight: 'bold',
-    color: '#2D4628'
+    fontSize: 16
   },
 
-  label: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 5
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 20
   },
 
-  totalPrice: {
-    fontSize: 30,
+  totalLabel: {
+    fontSize: 22,
+    fontWeight: 'bold'
+  },
+
+  totalValue: {
+    fontSize: 28,
     fontWeight: '900',
-    color: '#A0522D'
+    color: '#2D4628'
   },
 
-  subTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#2D4628'
+  qrSection: {
+    alignItems: 'center',
+    marginVertical: 20
+  },
+
+  qrImage: {
+    width: 220,
+    height: 220
+  },
+
+  noteText: {
+    textAlign: 'center',
+    color: '#888',
+    fontStyle: 'italic',
+    marginTop: 8
   },
 
   methodContainer: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20
+    marginTop: 25,
+    width: '100%',
+    maxWidth: 500
   },
 
   methodBtn: {
     flex: 1,
     padding: 15,
-    backgroundColor: '#fff',
     borderRadius: 12,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2D4628'
+    borderColor: '#2D4628',
+    alignItems: 'center',
+    backgroundColor: 'white'
   },
 
   activeMethod: {
@@ -330,48 +369,36 @@ const styles = StyleSheet.create({
     color: '#2D4628'
   },
 
-  paymentBox: {
-    backgroundColor: 'white',
+  whatsappBtn: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#25D366',
     padding: 20,
-    borderRadius: 15,
+    borderRadius: 18,
     alignItems: 'center',
-    minHeight: 250
+    marginTop: 20
   },
 
-  paymentHint: {
-    marginBottom: 15,
-    color: '#666'
-  },
-
-  qrisImage: {
-    width: 250,
-    height: 250
-  },
-
-  brandName: {
-    marginTop: 15,
-    fontWeight: 'bold',
-    color: '#2D4628'
-  },
-
-  cashText: {
-    textAlign: 'center',
-    color: '#444',
-    lineHeight: 22
-  },
-
-  confirmBtn: {
-    backgroundColor: '#A0522D',
-    padding: 20,
-    borderRadius: 12,
-    marginTop: 30,
-    marginBottom: 50,
-    alignItems: 'center'
-  },
-
-  confirmText: {
+  whatsappText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16
+  },
+
+  backBtn: {
+    width: '100%',
+    maxWidth: 500,
+    borderWidth: 1,
+    borderColor: '#2D4628',
+    padding: 20,
+    borderRadius: 18,
+    alignItems: 'center',
+    marginTop: 15,
+    marginBottom: 40
+  },
+
+  backText: {
+    color: '#2D4628',
+    fontWeight: 'bold'
   }
 });
