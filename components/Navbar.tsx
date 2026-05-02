@@ -1,24 +1,29 @@
-// components/Navbar.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-// Pastikan path ini benar sesuai folder kamu
+import { useAuth } from '../context/AuthContext'; // TAMBAHKAN INI
 import { useCart } from '../context/CartContext';
 
 export default function Navbar() {
   const router = useRouter();
+  const { user } = useAuth(); // AMBIL DATA USER
   
-  // Menggunakan try-catch sederhana atau pengecekan null agar tidak error saat context belum siap
   const cartContext = useCart();
   const cart = cartContext?.cart || [];
-
-  // Hitung total item untuk indikator di logo keranjang
   const totalItems = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
+
+  // Logika: Jika sudah login ke profile, jika belum ke login
+  const handleAuthPress = () => {
+    if (user) {
+      router.push('/(user)/profile');
+    } else {
+      router.push('/auth/login');
+    }
+  };
 
   return (
     <View style={styles.navContainer}>
-      {/* Menu Kiri */}
       <View style={styles.leftLinks}>
         <TouchableOpacity onPress={() => router.push('/')}>
           <Text style={styles.linkText}>Home</Text>
@@ -31,7 +36,6 @@ export default function Navbar() {
         </TouchableOpacity>
       </View>
 
-      {/* Logo Tengah */}
       <View style={styles.logoWrapper}>
         <TouchableOpacity onPress={() => router.push('/')} style={styles.logoCircle}>
           <Image 
@@ -42,18 +46,14 @@ export default function Navbar() {
         </TouchableOpacity>
       </View>
 
-      {/* Menu Kanan */}
       <View style={styles.rightIcons}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/(user)/profile')}>
+        {/* LOGIKA TOMBOL LOGIN/PROFILE */}
+        <TouchableOpacity style={styles.iconBtn} onPress={handleAuthPress}>
            <Ionicons name="person-circle-outline" size={24} color="#C5A985" />
-           <Text style={styles.loginText}>Log In</Text>
+           <Text style={styles.loginText}>{user ? 'Profile' : 'Log In'}</Text>
         </TouchableOpacity>
         
-        {/* Logo Keranjang */}
-        <TouchableOpacity 
-          style={styles.cartBtn} 
-          onPress={() => router.push('/(user)/cart')}
-        >
+        <TouchableOpacity style={styles.cartBtn} onPress={() => router.push('/(user)/cart')}>
           <View>
             <Ionicons name="bag-outline" size={24} color="white" />
             {totalItems > 0 && (
@@ -68,6 +68,7 @@ export default function Navbar() {
   );
 }
 
+// ... styles tetap sama seperti kode kamu ...
 const styles = StyleSheet.create({
   navContainer: { 
     flexDirection: 'row', 

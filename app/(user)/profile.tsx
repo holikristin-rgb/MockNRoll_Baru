@@ -1,12 +1,25 @@
-// app/(user)/profile.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Navbar from '../../components/Navbar'; // PASTI KAN 'N' BESAR
+import Navbar from '../../components/Navbar';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!user) {
+        router.replace('/auth/login');
+      }
+    }, 0);
+    
+    return () => clearTimeout(timeout);
+  }, [user]);
+
+  if (!user) return null;
 
   return (
     <View style={styles.container}>
@@ -14,13 +27,18 @@ export default function ProfilePage() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
+            {/* [KODE BARU DI SINI] Mengambil foto dari user profile */}
             <Image 
-              source={{ uri: 'https://via.placeholder.com/150' }} 
+              source={
+                user?.profileImage 
+                  ? { uri: user.profileImage } 
+                  : { uri: 'https://via.placeholder.com/150' } // Placeholder jika foto belum ada
+              } 
               style={styles.avatar} 
             />
           </View>
-          <Text style={styles.userName}>Hanna Situmeang</Text>
-          <Text style={styles.userSub}>hanna@student.mi.id</Text>
+          <Text style={styles.userName}>{user.username}</Text>
+          <Text style={styles.userSub}>{user.email}</Text>
         </View>
 
         <View style={styles.infoSection}>
@@ -29,15 +47,15 @@ export default function ProfilePage() {
             <View style={styles.infoRow}>
               <Ionicons name="call-outline" size={20} color="#2D4628" />
               <View style={styles.infoTextGroup}>
-                <Text style={styles.infoLabel}>Nomor Telepon</Text>
-                <Text style={styles.infoValue}>0812-3456-7890</Text>
+                <Text style={styles.infoLabel}>Role</Text>
+                <Text style={styles.infoValue}>{user.role}</Text>
               </View>
             </View>
           </View>
 
           <TouchableOpacity 
             style={[styles.infoCard, { marginTop: 20, alignItems: 'center' }]}
-            onPress={() => router.push('/')}
+            onPress={logout}
           >
             <Text style={{ color: '#e11d48', fontWeight: 'bold' }}>Keluar Akun</Text>
           </TouchableOpacity>
@@ -47,6 +65,7 @@ export default function ProfilePage() {
   );
 }
 
+// ... styles tetap sama
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F1E9' },
   scrollContent: { paddingBottom: 40 },

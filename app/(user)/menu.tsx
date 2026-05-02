@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -10,19 +10,13 @@ import {
   View,
   useWindowDimensions
 } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-
-const MENU_DATA = [
-  { id: '1', name: 'Risol Matcha', price: 4000, image: require('../../assets/images/risol-matcha.png') },
-  { id: '2', name: 'Risol Coklat', price: 4000, image: require('../../assets/images/risol-coklat.png') },
-  { id: '3', name: 'Risol Bolognese', price: 4000, image: require('../../assets/images/risol-bolognese.png') },
-  { id: '4', name: 'Blueberry Yakult', price: 10000, image: require('../../assets/images/mocktail-blueberry.png') },
-  { id: '5', name: 'Strawberry Fresh', price: 10000, image: require('../../assets/images/mocktail-strawberry.png') },
-];
 
 export default function Shop() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { getMenus } = useAuth(); 
 
   const {
     cart,
@@ -30,6 +24,33 @@ export default function Shop() {
     removeFromCart,
     buyNow
   } = useCart();
+
+  const [displayMenu, setDisplayMenu] = useState<any[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadAllMenus = async () => {
+        const adminMenus = await getMenus();
+        
+        const formatted = adminMenus.map((m: any) => ({
+          ...m,
+          price: Number(m.price) || 0,
+          // Logika: Jika m.image adalah string (URI dari galeri), pakai itu. 
+          // Jika tidak, baru cek mapping ID 1-5.
+          image: typeof m.image === 'string' ? { uri: m.image } :
+                 m.id === '1' ? require('../../assets/images/risol-matcha.png') :
+                 m.id === '2' ? require('../../assets/images/risol-coklat.png') :
+                 m.id === '3' ? require('../../assets/images/risol-bolognese.png') :
+                 m.id === '4' ? require('../../assets/images/mocktail-blueberry.png') :
+                 m.id === '5' ? require('../../assets/images/mocktail-strawberry.png') : 
+                 null
+        }));
+
+        setDisplayMenu(formatted);
+      };
+      loadAllMenus();
+    }, [getMenus])
+  );
 
   const columns = width > 1024 ? 4 : width > 720 ? 3 : 2;
   const cardWidth = (width - (40 + (columns - 1) * 15)) / columns;
@@ -55,11 +76,15 @@ export default function Shop() {
     return (
       <View style={[styles.card, { width: cardWidth }]}>
         <View style={styles.imageWrapper}>
-          <Image
-            source={item.image}
-            style={styles.image}
-            resizeMode="contain"
-          />
+          {item.image ? (
+            <Image
+              source={item.image}
+              style={styles.image}
+              resizeMode="contain"
+            />
+          ) : (
+            <Ionicons name="fast-food-outline" size={40} color="#CCC" />
+          )}
         </View>
 
         <View style={styles.info}>
@@ -145,7 +170,7 @@ export default function Shop() {
 
       <FlatList
         key={`list-${columns}`}
-        data={MENU_DATA}
+        data={displayMenu}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={columns}
@@ -185,36 +210,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FDFDFD'
   },
-
   headerSection: {
     paddingHorizontal: 20,
     marginTop: 40,
     marginBottom: 15
   },
-
   headerTitle: {
     fontSize: 28,
     fontWeight: '900',
     color: '#2D4628'
   },
-
   headerSub: {
     fontSize: 12,
     color: '#A0522D',
     fontWeight: '700',
     letterSpacing: 1
   },
-
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 120
   },
-
   row: {
     justifyContent: 'flex-start',
     gap: 15
   },
-
   card: {
     backgroundColor: 'white',
     marginBottom: 20,
@@ -224,7 +243,6 @@ const styles = StyleSheet.create({
     borderColor: '#F2F2F2',
     elevation: 2
   },
-
   imageWrapper: {
     width: '100%',
     height: 110,
@@ -234,28 +252,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8
   },
-
   image: {
     width: '85%',
     height: '85%'
   },
-
   info: {
     alignItems: 'center'
   },
-
   nameText: {
     fontSize: 14,
     fontWeight: '800',
     color: '#2D4628'
   },
-
   priceText: {
     fontSize: 13,
     color: '#2D4628',
     fontWeight: '600'
   },
-
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -265,7 +278,6 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     gap: 10
   },
-
   qtyBtn: {
     width: 24,
     height: 24,
@@ -274,19 +286,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-
   qtyNumber: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#2D4628'
   },
-
   actionRow: {
     flexDirection: 'row',
     gap: 8,
     width: '100%'
   },
-
   cartButton: {
     flex: 1,
     borderWidth: 1,
@@ -298,13 +307,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5
   },
-
   cartButtonText: {
     color: '#2D4628',
     fontWeight: 'bold',
     fontSize: 12
   },
-
   buyButton: {
     flex: 1,
     backgroundColor: '#A0522D',
@@ -312,13 +319,11 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center'
   },
-
   buyButtonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 12
   },
-
   floatingCart: {
     position: 'absolute',
     bottom: 30,
@@ -332,13 +337,11 @@ const styles = StyleSheet.create({
     gap: 8,
     elevation: 10
   },
-
   cartLabel: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14
   },
-
   badge: {
     position: 'absolute',
     top: -8,
@@ -350,7 +353,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-
   badgeText: {
     color: 'white',
     fontSize: 11,

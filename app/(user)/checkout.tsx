@@ -10,10 +10,12 @@ import {
   View
 } from 'react-native';
 import Navbar from '../../components/Navbar';
+import { useAuth } from '../../context/AuthContext'; // [TAMBAHAN] Import useAuth
 import { useCart } from '../../context/CartContext';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
+  const { addOrder, user } = useAuth(); // [TAMBAHAN] Ambil fungsi addOrder
   const [method, setMethod] = useState('QRIS');
   const router = useRouter();
 
@@ -34,6 +36,16 @@ export default function CheckoutPage() {
 
   const handleWhatsappConfirm = async () => {
     const adminNumber = '6281269197525';
+
+    // [TAMBAHAN] Simpan data pesanan ke database (AuthContext) sebelum pindah halaman
+    await addOrder({
+      invoice: invoiceNumber,
+      customer: user?.username || 'Guest',
+      total: totalPrice,
+      method: method,
+      items: cart,
+      date: today
+    });
 
     const message =
       method === 'QRIS'
@@ -105,7 +117,7 @@ Saya akan melakukan pembayaran saat pengambilan pesanan. Terima kasih!
 
           {/* Order List */}
           <View style={styles.orderList}>
-            {cart.map((item) => (
+           {  cart.map((item: any) => (
               <View
                 key={item.id}
                 style={styles.orderRow}
@@ -224,17 +236,16 @@ Saya akan melakukan pembayaran saat pengambilan pesanan. Terima kasih!
   );
 }
 
+// ... styles tetap sama sesuai kode asli kamu
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
     backgroundColor: '#F7F7F7'
   },
-
   container: {
     padding: 20,
     alignItems: 'center'
   },
-
   receiptCard: {
     width: '100%',
     maxWidth: 500,
@@ -243,101 +254,83 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     elevation: 5
   },
-
   brandTitle: {
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
     color: '#2D4628'
   },
-
   brandSub: {
     textAlign: 'center',
     color: '#A0522D',
     fontWeight: 'bold',
     marginBottom: 25
   },
-
   line: {
     borderBottomWidth: 1,
     borderBottomColor: '#DDD',
     marginVertical: 20
   },
-
   invoiceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
-
   label: {
     color: '#999',
     fontSize: 12
   },
-
   invoiceText: {
     fontWeight: 'bold',
     fontSize: 16,
     marginTop: 5
   },
-
   orderList: {
     marginVertical: 20
   },
-
   orderRow: {
     flexDirection: 'row',
     marginBottom: 12
   },
-
   orderQty: {
     width: 40,
     fontWeight: 'bold'
   },
-
   orderName: {
     flex: 1,
     fontSize: 16
   },
-
   orderPrice: {
     fontWeight: 'bold',
     fontSize: 16
   },
-
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 20
   },
-
   totalLabel: {
     fontSize: 22,
     fontWeight: 'bold'
   },
-
   totalValue: {
     fontSize: 28,
     fontWeight: '900',
     color: '#2D4628'
   },
-
   qrSection: {
     alignItems: 'center',
     marginVertical: 20
   },
-
   qrImage: {
     width: 220,
     height: 220
   },
-
   noteText: {
     textAlign: 'center',
     color: '#888',
     fontStyle: 'italic',
     marginTop: 8
   },
-
   methodContainer: {
     flexDirection: 'row',
     gap: 10,
@@ -345,7 +338,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500
   },
-
   methodBtn: {
     flex: 1,
     padding: 15,
@@ -355,20 +347,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'white'
   },
-
   activeMethod: {
     backgroundColor: '#2D4628'
   },
-
   activeText: {
     color: 'white',
     fontWeight: 'bold'
   },
-
   normalText: {
     color: '#2D4628'
   },
-
   whatsappBtn: {
     width: '100%',
     maxWidth: 500,
@@ -378,13 +366,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20
   },
-
   whatsappText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16
   },
-
   backBtn: {
     width: '100%',
     maxWidth: 500,
@@ -396,7 +382,6 @@ const styles = StyleSheet.create({
     marginTop: 15,
     marginBottom: 40
   },
-
   backText: {
     color: '#2D4628',
     fontWeight: 'bold'
