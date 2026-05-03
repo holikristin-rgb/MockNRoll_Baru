@@ -1,389 +1,469 @@
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import { useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Image,
   Linking,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
-} from 'react-native';
-import Navbar from '../../components/Navbar';
-import { useAuth } from '../../context/AuthContext'; // [TAMBAHAN] Import useAuth
-import { useCart } from '../../context/CartContext';
+  View,
+} from "react-native";
+import ViewShot from "react-native-view-shot";
+import Navbar from "../../components/Navbar";
+import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
+
+// Pastikan path gambar QRIS sesuai dengan folder assets Anda
+const QRIS_IMAGE = require("../../assets/images/qris-payment.png");
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
-  const { addOrder, user } = useAuth(); // [TAMBAHAN] Ambil fungsi addOrder
-  const [method, setMethod] = useState('QRIS');
+  const { addOrder, user } = useAuth();
+  const [method, setMethod] = useState<string | null>(null);
+  const [uploadBukti, setUploadBukti] = useState<string | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
   const router = useRouter();
+  const viewShotRef = useRef<any>(null);
 
-  // Generate invoice number
-  const invoiceNumber = useMemo(() => {
-    const randomNumber = Math.floor(
-      10000 + Math.random() * 90000
-    );
-    return `MNR-${randomNumber}`;
-  }, []);
+  // State untuk Custom Popup
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: "", message: "" });
 
-  // Generate tanggal
-  const today = new Date().toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
+  const invoiceNumber = useMemo(
+    () => `MNR-${Math.floor(10000 + Math.random() * 90000)}`,
+    [],
+  );
+  const today = new Date().toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
 
-  const handleWhatsappConfirm = async () => {
-    const adminNumber = '6281269197525';
+  const showAlert = (title: string, message: string) => {
+    setModalContent({ title, message });
+    setModalVisible(true);
+  };
 
-    // [TAMBAHAN] Simpan data pesanan ke database (AuthContext) sebelum pindah halaman
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+    if (!result.canceled) {
+      setUploadBukti(result.assets[0].uri);
+    }
+  };
+
+  const isButtonDisabled = !method || (method === "QRIS" && !uploadBukti);
+
+  const sendWhatsAppConfirmation = () => {
+    const phoneNumber = "6281269197525"; // Nomor WhatsApp tujuan yang sudah diperbarui
+    const orderDetails = cart
+      .map((item: any) => `- ${item.name} (${item.quantity}x)`)
+      .join("\n");
+    const message = `*KONFIRMASI PESANAN TUNAI*\n\n*Invoice:* ${invoiceNumber}\n*Nama:* ${user?.username || "Guest"}\n*Total:* Rp ${totalPrice.toLocaleString("id-ID")}\n\n*Pesanan:*\n${orderDetails}\n\nSaya bayar tunai di tempat.`;
+    const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+    Linking.openURL(url).catch(() =>
+      showAlert("Error", "Gagal membuka WhatsApp."),
+    );
+  };
+
+  const handleShareStruk = async () => {
+    if (Platform.OS === "web") {
+      showAlert(
+        "⚠️ Notifikasi",
+        "Fitur Bagikan Struk hanya tersedia untuk pengguna handphone.",
+      );
+      return;
+    }
+    try {
+      const uri = await viewShotRef.current.capture();
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      showAlert("❌ Error", "Terjadi kesalahan saat membagikan struk.");
+    }
+  };
+
+  const handleDownloadStruk = async () => {
+    if (Platform.OS === "web") {
+      showAlert(
+        "⚠️ Notifikasi",
+        "Fitur Unduh Struk hanya tersedia untuk pengguna handphone.",
+      );
+      return;
+    }
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === "granted") {
+        const uri = await viewShotRef.current.capture();
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAlbumAsync("MockNRoll", asset, false);
+        showAlert(
+          "📸 Berhasil",
+          "Struk belanja sudah tersimpan di album 'MockNRoll' pada galeri kamu!",
+        );
+      } else {
+        showAlert(
+          "🚫 Izin Ditolak",
+          "Butuh izin akses galeri untuk menyimpan struk.",
+        );
+      }
+    } catch (error) {
+      showAlert(
+        "❌ Error",
+        "Gagal mengunduh struk. Pastikan izin penyimpanan sudah aktif.",
+      );
+    }
+  };
+
+  const handleKonfirmasiFinal = async () => {
+    if (isButtonDisabled) return;
     await addOrder({
       invoice: invoiceNumber,
-      customer: user?.username || 'Guest',
+      customer: user?.username || "Guest",
       total: totalPrice,
       method: method,
       items: cart,
-      date: today
+      date: today,
+      bukti: uploadBukti,
     });
-
-    const message =
-      method === 'QRIS'
-        ? `
-Halo MOCK'N'ROLLS! Saya ingin konfirmasi pembayaran.
-
-No. Invoice: ${invoiceNumber}
-Total: Rp ${totalPrice.toLocaleString('id-ID')}
-
-Saya akan segera mengirimkan bukti transfernya. Terima kasih!
-`
-        : `
-Halo MOCK'N'ROLLS! Saya ingin konfirmasi pesanan cash.
-
-No. Invoice: ${invoiceNumber}
-Total: Rp ${totalPrice.toLocaleString('id-ID')}
-
-Saya akan melakukan pembayaran saat pengambilan pesanan. Terima kasih!
-`;
-
-    const whatsappUrl =
-      `https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`;
-
-    await Linking.openURL(whatsappUrl);
-
-    clearCart();
-    router.push('/(user)/menu');
+    setIsFinished(true);
+    if (method === "TUNAI") sendWhatsAppConfirmation();
   };
 
   return (
     <View style={styles.wrapper}>
       <Navbar />
 
+      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>{modalContent.title}</Text>
+            <Text style={styles.modalText}>{modalContent.message}</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Mengerti</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Receipt */}
-        <View style={styles.receiptCard}>
-          <Text style={styles.brandTitle}>
-            MOCK'N'ROLLS
-          </Text>
-
-          <Text style={styles.brandSub}>
-            PREMIUM RISOL & MOCKTAIL
-          </Text>
-
-          <View style={styles.line} />
-
-          {/* Invoice */}
-          <View style={styles.invoiceRow}>
-            <View>
-              <Text style={styles.label}>
-                NO. INVOICE
-              </Text>
-
-              <Text style={styles.invoiceText}>
-                {invoiceNumber}
+        <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }}>
+          <View style={styles.receiptCard}>
+            <View style={styles.receiptHeader}>
+              <Text style={styles.brandTitle}>{"MOCK'N'ROLLS"}</Text>
+              <Text style={styles.brandSub}>PREMIUM RISOL & MOCKTAIL</Text>
+            </View>
+            <View style={styles.dashedLine} />
+            <View style={styles.orderList}>
+              {cart.map((item: any) => (
+                <View key={item.id} style={styles.orderRow}>
+                  <Text style={styles.orderQty}>{item.quantity}x</Text>
+                  <Text style={styles.orderName}>{item.name}</Text>
+                  <Text style={styles.orderPrice}>
+                    Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.line} />
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalLabel}>Total Bayar</Text>
+              <Text style={styles.totalValue}>
+                Rp {totalPrice.toLocaleString("id-ID")}
               </Text>
             </View>
-
-            <View>
-              <Text style={styles.label}>
-                TANGGAL
+            {isFinished && (
+              <Text style={styles.statusLabel}>
+                {method === "QRIS"
+                  ? "STATUS: LUNAS (QRIS)"
+                  : "STATUS: MENUNGGU TUNAI"}
               </Text>
-
-              <Text style={styles.invoiceText}>
-                {today}
-              </Text>
-            </View>
+            )}
+            <Text style={styles.footerNote}>
+              {"Terima kasih sudah jajan di MOCK'N'ROLLS!"}
+            </Text>
           </View>
+        </ViewShot>
 
-          {/* Order List */}
-          <View style={styles.orderList}>
-           {  cart.map((item: any) => (
-              <View
-                key={item.id}
-                style={styles.orderRow}
+        {!isFinished && (
+          <View style={styles.selectionArea}>
+            <Text style={styles.sectionTitle}>Pilih Metode Pembayaran</Text>
+            <View style={styles.methodRow}>
+              <TouchableOpacity
+                style={[
+                  styles.methodBtn,
+                  method === "QRIS" && styles.activeBtn,
+                ]}
+                onPress={() => setMethod("QRIS")}
               >
-                <Text style={styles.orderQty}>
-                  {item.quantity}x
+                <Text
+                  style={[
+                    styles.methodText,
+                    method === "QRIS" && styles.activeText,
+                  ]}
+                >
+                  QRIS
                 </Text>
-
-                <Text style={styles.orderName}>
-                  {item.name}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.methodBtn,
+                  method === "TUNAI" && styles.activeBtn,
+                ]}
+                onPress={() => {
+                  setMethod("TUNAI");
+                  setUploadBukti(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.methodText,
+                    method === "TUNAI" && styles.activeText,
+                  ]}
+                >
+                  TUNAI
                 </Text>
-
-                <Text style={styles.orderPrice}>
-                  Rp {(item.price * item.quantity).toLocaleString('id-ID')}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.line} />
-
-          {/* Total */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>
-              Total Pembayaran
-            </Text>
-
-            <Text style={styles.totalValue}>
-              Rp {totalPrice.toLocaleString('id-ID')}
-            </Text>
-          </View>
-
-          {/* QRIS */}
-          {method === 'QRIS' && (
-            <View style={styles.qrSection}>
-              <Image
-                source={require('../../assets/images/qris-payment.png')}
-                style={styles.qrImage}
-                resizeMode="contain"
-              />
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* Dynamic Notes */}
-          <Text style={styles.noteText}>
-            {method === 'QRIS'
-              ? '* Pesanan diproses setelah konfirmasi bukti bayar.'
-              : '* Pesanan diproses dan dibayar saat pengambilan (Cash).'}
-          </Text>
+            {method === "QRIS" && (
+              <View style={styles.qrContainer}>
+                <Image
+                  source={QRIS_IMAGE}
+                  style={styles.qrImage}
+                  resizeMode="contain"
+                />
+                <Text style={styles.uploadInfo}>
+                  Upload Bukti Transfer Kamu:
+                </Text>
+                <TouchableOpacity style={styles.uploadArea} onPress={pickImage}>
+                  {uploadBukti ? (
+                    <Image
+                      source={{ uri: uploadBukti }}
+                      style={styles.previewImage}
+                    />
+                  ) : (
+                    <Text style={styles.placeholderText}>
+                      + Pilih Foto Bukti Bayar
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
-          <Text style={styles.noteText}>
-            Terima kasih sudah jajan di MOCK'N'ROLLS!
-          </Text>
-        </View>
-
-        {/* Payment Method */}
-        <View style={styles.methodContainer}>
-          <TouchableOpacity
-            style={[
-              styles.methodBtn,
-              method === 'QRIS' && styles.activeMethod
-            ]}
-            onPress={() => setMethod('QRIS')}
-          >
-            <Text
-              style={
-                method === 'QRIS'
-                  ? styles.activeText
-                  : styles.normalText
-              }
+            <TouchableOpacity
+              style={[
+                styles.confirmBtn,
+                isButtonDisabled && styles.disabledBtn,
+              ]}
+              onPress={handleKonfirmasiFinal}
+              disabled={isButtonDisabled}
             >
-              QRIS
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.confirmBtnText}>
+                {method === "TUNAI"
+                  ? "Selesaikan & Konfirmasi WA"
+                  : "Selesaikan Pemesanan"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-          <TouchableOpacity
-            style={[
-              styles.methodBtn,
-              method === 'CASH' && styles.activeMethod
-            ]}
-            onPress={() => setMethod('CASH')}
-          >
-            <Text
-              style={
-                method === 'CASH'
-                  ? styles.activeText
-                  : styles.normalText
-              }
+        {isFinished && (
+          <View style={styles.actionArea}>
+            <TouchableOpacity
+              style={styles.shareBtn}
+              onPress={handleShareStruk}
             >
-              CASH
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* WhatsApp Button */}
-        <TouchableOpacity
-          style={styles.whatsappBtn}
-          onPress={handleWhatsappConfirm}
-        >
-          <Text style={styles.whatsappText}>
-            Konfirmasi ke WhatsApp
-          </Text>
-        </TouchableOpacity>
-
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.push('/(user)/menu')}
-        >
-          <Text style={styles.backText}>
-            Kembali ke Beranda
-          </Text>
-        </TouchableOpacity>
+              <Text style={styles.confirmBtnText}>Bagikan Struk</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.downloadBtn}
+              onPress={handleDownloadStruk}
+            >
+              <Text style={styles.confirmBtnText}>Unduh Struk</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.finishBtn}
+              onPress={() => {
+                clearCart();
+                router.push("/(user)/menu");
+              }}
+            >
+              <Text style={styles.finishBtnText}>
+                Selesai & Kembali ke Menu
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-// ... styles tetap sama sesuai kode asli kamu
 const styles = StyleSheet.create({
-  wrapper: {
+  wrapper: { flex: 1, backgroundColor: "#F7F7F7" },
+  container: { padding: 20 },
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#F7F7F7'
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  container: {
-    padding: 20,
-    alignItems: 'center'
+  modalView: {
+    width: 320,
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    elevation: 5,
   },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#2D4628",
+    marginBottom: 15,
+  },
+  modalText: {
+    fontSize: 14,
+    color: "#555",
+    textAlign: "center",
+    marginBottom: 25,
+    lineHeight: 20,
+  },
+  modalButton: {
+    backgroundColor: "#2D4628",
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 10,
+  },
+  modalButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
   receiptCard: {
-    width: '100%',
-    maxWidth: 500,
-    backgroundColor: 'white',
-    padding: 30,
-    borderRadius: 25,
-    elevation: 5
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 25,
+    elevation: 5,
   },
-  brandTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    textAlign: 'center',
-    color: '#2D4628'
-  },
+  receiptHeader: { alignItems: "center" },
+  brandTitle: { fontSize: 26, fontWeight: "900", color: "#2D4628" },
   brandSub: {
-    textAlign: 'center',
-    color: '#A0522D',
-    fontWeight: 'bold',
-    marginBottom: 25
+    fontSize: 10,
+    color: "#A0522D",
+    fontWeight: "bold",
+    letterSpacing: 1,
   },
-  line: {
+  dashedLine: {
     borderBottomWidth: 1,
-    borderBottomColor: '#DDD',
-    marginVertical: 20
+    borderColor: "#EEE",
+    borderStyle: "dashed",
+    marginVertical: 15,
   },
-  invoiceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  label: {
-    color: '#999',
-    fontSize: 12
-  },
-  invoiceText: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginTop: 5
-  },
-  orderList: {
-    marginVertical: 20
-  },
+  orderList: { marginVertical: 10 },
   orderRow: {
-    flexDirection: 'row',
-    marginBottom: 12
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
-  orderQty: {
-    width: 40,
-    fontWeight: 'bold'
+  orderQty: { width: 35, fontWeight: "bold", color: "#2D4628" },
+  orderName: { flex: 1, color: "#444" },
+  orderPrice: { fontWeight: "bold", color: "#2D4628" },
+  line: { height: 1, backgroundColor: "#F0F0F0", marginVertical: 12 },
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  orderName: {
-    flex: 1,
-    fontSize: 16
+  totalLabel: { fontSize: 18, fontWeight: "bold" },
+  totalValue: { fontSize: 22, fontWeight: "900", color: "#2D4628" },
+  statusLabel: {
+    textAlign: "center",
+    color: "#2D4628",
+    fontWeight: "900",
+    marginTop: 20,
+    fontSize: 16,
   },
-  orderPrice: {
-    fontWeight: 'bold',
-    fontSize: 16
+  footerNote: {
+    textAlign: "center",
+    fontSize: 10,
+    color: "#BBB",
+    marginTop: 15,
+    fontStyle: "italic",
   },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 20
+  selectionArea: { marginTop: 25 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#333",
   },
-  totalLabel: {
-    fontSize: 22,
-    fontWeight: 'bold'
-  },
-  totalValue: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#2D4628'
-  },
-  qrSection: {
-    alignItems: 'center',
-    marginVertical: 20
-  },
-  qrImage: {
-    width: 220,
-    height: 220
-  },
-  noteText: {
-    textAlign: 'center',
-    color: '#888',
-    fontStyle: 'italic',
-    marginTop: 8
-  },
-  methodContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 25,
-    width: '100%',
-    maxWidth: 500
-  },
+  methodRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   methodBtn: {
     flex: 1,
-    padding: 15,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2D4628',
-    alignItems: 'center',
-    backgroundColor: 'white'
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    alignItems: "center",
   },
-  activeMethod: {
-    backgroundColor: '#2D4628'
+  activeBtn: { borderColor: "#2D4628", backgroundColor: "#E9F0E8" },
+  methodText: { fontWeight: "bold", color: "#888" },
+  activeText: { color: "#2D4628" },
+  qrContainer: { alignItems: "center", marginBottom: 20 },
+  qrImage: { width: 200, height: 200, marginBottom: 15 },
+  uploadInfo: {
+    alignSelf: "flex-start",
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#555",
+    marginBottom: 8,
   },
-  activeText: {
-    color: 'white',
-    fontWeight: 'bold'
+  uploadArea: {
+    width: "100%",
+    height: 120,
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 2,
+    borderColor: "#CCC",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
   },
-  normalText: {
-    color: '#2D4628'
+  previewImage: { width: "100%", height: "100%" },
+  placeholderText: { color: "#AAA", fontSize: 13 },
+  confirmBtn: {
+    backgroundColor: "#2D4628",
+    padding: 18,
+    borderRadius: 15,
+    alignItems: "center",
   },
-  whatsappBtn: {
-    width: '100%',
-    maxWidth: 500,
-    backgroundColor: '#25D366',
-    padding: 20,
-    borderRadius: 18,
-    alignItems: 'center',
-    marginTop: 20
+  disabledBtn: { backgroundColor: "#CCC" },
+  confirmBtnText: { color: "#FFF", fontWeight: "bold", fontSize: 16 },
+  actionArea: { marginTop: 20 },
+  shareBtn: {
+    backgroundColor: "#3498DB",
+    padding: 18,
+    borderRadius: 15,
+    alignItems: "center",
+    marginBottom: 10,
   },
-  whatsappText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16
+  downloadBtn: {
+    backgroundColor: "#E67E22",
+    padding: 18,
+    borderRadius: 15,
+    alignItems: "center",
+    marginBottom: 10,
   },
-  backBtn: {
-    width: '100%',
-    maxWidth: 500,
-    borderWidth: 1,
-    borderColor: '#2D4628',
-    padding: 20,
-    borderRadius: 18,
-    alignItems: 'center',
-    marginTop: 15,
-    marginBottom: 40
-  },
-  backText: {
-    color: '#2D4628',
-    fontWeight: 'bold'
-  }
+  finishBtn: { padding: 15, alignItems: "center", marginTop: 5 },
+  finishBtnText: { color: "#2D4628", fontWeight: "bold", fontSize: 15 },
 });

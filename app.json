@@ -38,6 +38,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow MOCK'N'ROLLS to save receipts to your gallery."
+        }
       ]
     ],
     "experiments": {
