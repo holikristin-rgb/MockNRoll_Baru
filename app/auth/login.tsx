@@ -1,30 +1,35 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'; // [TAMBAHAN]
-import { useFocusEffect, useRouter } from 'expo-router'; // [TAMBAHAN] useFocusEffect
-import React, { useCallback, useState } from 'react'; // [TAMBAHAN] useCallback
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 export default function LoginScreen() {
-  const router = useRouter(); 
+  const router = useRouter();
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
 
-  // [TAMBAHAN] Logika Auto-Fill dari Register
   useFocusEffect(
     useCallback(() => {
       const checkTempLogin = async () => {
-        const temp = await AsyncStorage.getItem('tempLogin');
+        const temp = await AsyncStorage.getItem("tempLogin");
         if (temp) {
           const { identifier, password } = JSON.parse(temp);
           setIdentifier(identifier);
           setPassword(password);
-          // Langsung hapus agar tidak muncul terus saat logout nanti
-          await AsyncStorage.removeItem('tempLogin');
+          await AsyncStorage.removeItem("tempLogin");
         }
       };
       checkTempLogin();
-    }, [])
+    }, []),
   );
 
   const handleLogin = async () => {
@@ -32,16 +37,13 @@ export default function LoginScreen() {
       Alert.alert("Peringatan", "Isi data dulu!");
       return;
     }
-    
     try {
       const result = await login(identifier, password);
-      
       if (result.success) {
-        if (result.role === 'admin') {
-          router.replace('/dashboard'); 
+        if (result.role === "admin") {
+          router.replace("/dashboard");
         } else {
-          // [PERUBAHAN DI SINI] Diarahkan ke setup profil dulu setelah login berhasil
-          router.replace('/auth/setup-profile'); 
+          router.replace("/auth/setup-profile");
         }
       } else {
         Alert.alert("Gagal", result.message);
@@ -54,29 +56,27 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
-      <TextInput 
-        placeholder="Username" 
-        placeholderTextColor="#888"
-        style={styles.input} 
+      <TextInput
+        placeholder="Username"
+        style={styles.input}
         value={identifier}
-        onChangeText={setIdentifier} 
+        onChangeText={setIdentifier}
         autoCapitalize="none"
       />
-      <TextInput 
-        placeholder="Password" 
-        placeholderTextColor="#888"
-        style={styles.input} 
-        secureTextEntry 
+      <TextInput
+        placeholder="Password"
+        style={styles.input}
+        secureTextEntry
         value={password}
-        onChangeText={setPassword} 
+        onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={handleLogin} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>MASUK</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.push('/auth/register')}>
-        <Text style={{color: 'white', marginTop: 20, textAlign: 'center'}}>
-          Belum punya akun? <Text style={{color: '#C5A985'}}>Daftar Akun Baru</Text>
+      <TouchableOpacity onPress={() => router.push("/auth/register")}>
+        <Text style={{ color: "white", marginTop: 20, textAlign: "center" }}>
+          Belum punya akun?{" "}
+          <Text style={{ color: "#C5A985" }}>Daftar Aku Baru</Text>
         </Text>
       </TouchableOpacity>
     </View>
@@ -84,9 +84,25 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#0E2F22' },
-  title: { fontSize: 32, color: '#C5A985', textAlign: 'center', marginBottom: 20, fontWeight: 'bold' },
-  input: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 10, color: '#000' },
-  button: { backgroundColor: '#C5A985', padding: 15, borderRadius: 10, marginTop: 10 },
-  buttonText: { textAlign: 'center', color: 'white', fontWeight: 'bold', fontSize: 16 }
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "#0E2F22",
+  },
+  title: {
+    fontSize: 32,
+    color: "#C5A985",
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "bold",
+  },
+  input: {
+    backgroundColor: "white",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  button: { backgroundColor: "#C5A985", padding: 15, borderRadius: 10 },
+  buttonText: { textAlign: "center", color: "white", fontWeight: "bold" },
 });

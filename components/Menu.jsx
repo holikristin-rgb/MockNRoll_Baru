@@ -1,28 +1,78 @@
-// components/Menu.jsx
-import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+// components/Menu.tsx
+import React from "react";
+import {
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+const { width } = Dimensions.get("window");
 
 const items = [
-  { id: 1, name: 'Risol Coklat', price: 'Rp. 10.000' },
-  { id: 2, name: 'Risol Matcha', price: 'Rp. 12.000' },
-  { id: 3, name: 'Risol Bolognese', price: 'Rp. 10.000' },
+  {
+    id: 1,
+    name: "Risol Coklat",
+    price: "Rp. 4.000",
+    desc: "Lumeran coklat premium dengan kulit risol yang renyah.",
+    image: require("../assets/images/risol-coklat.png"),
+  },
+  {
+    id: 2,
+    name: "Risol Matcha",
+    price: "Rp. 4.000",
+    desc: "Sensasi matcha otentik yang lumer di setiap gigitan.",
+    image: require("../assets/images/risol-matcha.png"),
+  },
+  {
+    id: 3,
+    name: "Blueberry Mocktail",
+    price: "Rp. 10.000",
+    desc: "Kesegaran blueberry asli dengan soda yang menyejukkan.",
+    image: require("../assets/images/mocktail-blueberry.png"),
+  },
 ];
 
 export default function Menu() {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Popular Item</Text>
-      <View style={styles.grid}>
-        {items.map(item => (
-          <View key={item.id} style={styles.card}>
-            {/* Pakai placeholder dulu */}
-            <Image 
-              source={{ uri: 'https://via.placeholder.com/150' }} 
-              style={styles.cardImg} 
+      <View style={styles.header}>
+        <Text style={styles.title}>Popular Item</Text>
+        <View style={styles.underline} />
+      </View>
+
+      <View style={styles.listContainer}>
+        {items.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.horizontalCard}
+            activeOpacity={0.7}
+          >
+            {/* Bagian Gambar Kecil */}
+            <Image
+              source={item.image}
+              style={styles.smallImg}
+              resizeMode="cover"
             />
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemPrice}>{item.price}</Text>
-          </View>
+
+            {/* Bagian Keterangan Produk */}
+            <View style={styles.textContainer}>
+              <View>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemDesc} numberOfLines={2}>
+                  {item.desc}
+                </Text>
+              </View>
+              <Text style={styles.itemPrice}>{item.price}</Text>
+            </View>
+
+            {/* Dekorasi tombol plus kecil */}
+            <View style={styles.addButton}>
+              <Text style={styles.addIcon}>+</Text>
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
     </View>
@@ -30,11 +80,81 @@ export default function Menu() {
 }
 
 const styles = StyleSheet.create({
-  section: { paddingVertical: 50, backgroundColor: '#F4F1E9', alignItems: 'center' },
-  sectionTitle: { fontSize: 28, fontWeight: 'bold', color: '#2D4628', marginBottom: 30 },
-  grid: { flexDirection: 'row', gap: 20 },
-  card: { backgroundColor: 'white', padding: 15, borderRadius: 10, alignItems: 'center', width: 220 },
-  cardImg: { width: 180, height: 120, borderRadius: 8, marginBottom: 10 },
-  itemName: { fontWeight: 'bold', fontSize: 18, color: '#2D4628' },
-  itemPrice: { color: '#666', marginTop: 5 }
+  section: {
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+    backgroundColor: "#F4F1E9",
+  },
+  header: {
+    marginBottom: 25,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#2D4628",
+  },
+  underline: {
+    height: 3,
+    width: 40,
+    backgroundColor: "#C5A985",
+    marginTop: 4,
+  },
+  listContainer: {
+    gap: 15,
+  },
+  horizontalCard: {
+    flexDirection: "row",
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 12,
+    alignItems: "center",
+    // Shadow halus
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  smallImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 15,
+    backgroundColor: "#f9f9f9",
+  },
+  textContainer: {
+    flex: 1,
+    marginLeft: 15,
+    justifyContent: "space-between",
+    height: 80,
+    paddingVertical: 2,
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D4628",
+  },
+  itemDesc: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  itemPrice: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#C5A985",
+  },
+  addButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: "#2D4628",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addIcon: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
 });
